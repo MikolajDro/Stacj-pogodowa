@@ -6,6 +6,7 @@
  */
 #include "functions_test.h"
 #include "simple.h"
+#include "Debug.h"
 
 
 IMAGE_T *ImageCreator(void)
@@ -28,6 +29,10 @@ IMAGE_T *ImageCreator(void)
 
 int EpaperINIT(IMAGE_T *Image)
 {
+	HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+
 	EPD_2IN13B_V4_Init();
 	if(Image == NULL || Image->BlackImage == NULL || Image->Imagesize == 0)
 	{
@@ -36,6 +41,7 @@ int EpaperINIT(IMAGE_T *Image)
 
     Paint_SelectImage(Image->BlackImage);
     Paint_Clear(WHITE);
+	Paint_DrawBitMap_Paste(gInitImage122X250, 0, 0, 122, 250, BLACK);
     EPD_2IN13B_V4_Display(Image->BlackImage);
     return 0;
 }
@@ -46,112 +52,78 @@ void EpaperWakeUp(void)
 }
 
 
-void Posiotion_test(IMAGE_T *Image)
+int DrawNormalTemperature(IMAGE_T *Image, STATION_DATA_T *station_data)
 {
-	if(Image == NULL || Image->BlackImage == NULL || Image->Imagesize == 0)
-	{
-		return;
-	}
-	Paint_SelectImage(Image->BlackImage);
-	Paint_Clear(WHITE);
-	Paint_DrawPoint(100, 100, BLACK, DOT_PIXEL_5X5, DOT_STYLE_DFT);
+	if (BME680OFF)
+		station_data->temp = 21.37;
 
-	EPD_2IN13B_V4_Display(Image->BlackImage);
-}
-
-void Draw_SimpleImage(IMAGE_T *Image)
-{
-	if(Image == NULL || Image->BlackImage == NULL || Image->Imagesize == 0)
+	if(Image == NULL || station_data == NULL)
 	{
-		return;
+		return -1;
 	}
 
-	Paint_SelectImage(Image->BlackImage);
-	Paint_Clear(WHITE);
-	Paint_DrawBitMap_Paste(gSimpleSimplest122X250, 0, 0, 122, 250, BLACK);
+	//Set appropriate flag or end
+	if(station_data->temp >= 0. && station_data->temp < 10.)
+		station_data->tempFlag = 0;
+	else if(station_data->temp >= 10. && station_data->temp < 20.)
+		station_data->tempFlag = 1;
+	else if(station_data->temp >= 20. && station_data->temp < 30.)
+		station_data->tempFlag = 2;
+	else if(station_data->temp >= 30. && station_data->temp < 40.)
+		station_data->tempFlag = 3;
+	else
+		return -1;
 
-	EPD_2IN13B_V4_Display(Image->BlackImage);
+
+	//Temperature level image selector
+	switch (station_data->tempFlag){
+		case 0:
+			Paint_DrawBitMap_Paste(gNormalTempTerriblyHot60X60, 62, 130, 60, 60, BLACK);
+			break;
+		case 1:
+			Paint_DrawBitMap_Paste(gNormalTempVeryHot60X60, 62, 130, 60, 60, BLACK);
+			break;
+		case 2:
+			Paint_DrawBitMap_Paste(gNormalTempGood60X60, 62, 130, 60, 60, BLACK);
+			break;
+		case 3:
+			Paint_DrawBitMap_Paste(gNormalTempHot60X60, 62, 130, 60, 60, BLACK);
+			break;
+		default:
+			break;
+	}
+	Paint_DrawString_EN(0, 150, STEMP, &Font8, WHITE, BLACK);
+	station_data->xShift = station_data->temp >= 10. || station_data->temp <= 10. ? 45 : 34;
+	Paint_DrawNumDecimals(0, 160, station_data->temp, &Font16, 1, BLACK, WHITE);
+	Paint_DrawCircle(station_data->xShift, 163, 1, BLACK, 1, DRAW_FILL_EMPTY);
+	Paint_DrawString_EN(station_data->xShift, 160, "C", &Font16, WHITE, BLACK);
+
+	return 0;
 }
 
-void DrawNormalTheme(IMAGE_T *Image)
+int DrawNormalPressure(IMAGE_T *Image, STATION_DATA_T *station_data)
 {
-	EPD_2IN13B_V4_Clear();
-	Paint_SelectImage(Image->BlackImage);
-	Paint_Clear(WHITE);
+	if (BME680OFF)
+		station_data->pres = 1002.123;
 
-	Paint_DrawString_EN(10, 0, "KN KOIoT", &Font12, WHITE, BLACK);
+	if(Image == NULL || station_data == NULL)
+	{
+		return -1;
+	}
 
-	uint16_t tempFlag, hum, humFlag, bat, batFlag, air, airFlag, pres, presFlag; //prototype values
-	uint8_t xShift;
-	float temp = 10.4122;
-	hum  = 50;
-	air  = 129;
-	pres = 1012;
-	bat = 100; // Battery 1-100
-
-	const char sTemp[] 	= "Temperature";
-	const char sHum[]	= "Humidity";
-	const char sAir[]	= "Air quality";
-	const char sPres[]	= "Pressure";
-
-
-	if(pres > 900 && pres < 980)
-		presFlag = 0;
-	else if(pres >= 980 && pres <= 1025)
-		presFlag = 1;
-	else if(pres > 1025 && pres <= 1080)
-		presFlag = 2;
+	//Set appropriate flag or end
+	if(station_data->pres > 900. && station_data->pres < 980.)
+		station_data->presFlag = 0;
+	else if(station_data->pres >= 980. && station_data->pres <= 1025.)
+		station_data->presFlag = 1;
+	else if(station_data->pres > 1025. && station_data->pres <= 1080.)
+		station_data->presFlag = 2;
 	else
-		return;
-
-	if(temp >= 0 && temp < 10)
-		tempFlag = 0;
-	else if(temp >= 10 && temp < 20)
-		tempFlag = 1;
-	else if(temp >= 20 && temp < 30)
-		tempFlag = 2;
-	else if(temp >= 30 && temp < 40)
-		tempFlag = 3;
-	else
-		return;
-
-
-	if(hum >= 0 && hum < 45)
-		humFlag = 0;
-	else if(hum >= 45 && hum <= 65)
-		humFlag = 1;
-	else if(hum >= 66 && hum <= 100)
-		humFlag = 2;
-	else
-		return;
-
-
-	if(air >= 0 && air <= 25)
-		airFlag = 0;
-	else if (air > 25 && air <= 50)
-		airFlag = 1;
-	else if (air > 50 && air <= 100)
-		airFlag = 2;
-	else if (air > 100 && air <= 210)
-		airFlag = 3;
-	else if (air > 210 && air <= 500)
-		airFlag = 4;
-	else
-		return;
-
-
-	if(bat >= 80 && bat <= 100)
-		batFlag = 0;
-	else if(bat >= 40 && bat < 80)
-		batFlag = 1;
-	else if(bat >= 0 && bat < 40)
-		batFlag = 2;
-	else
-		return;
+		return -1;
 
 
 	//Pressure level image selector
-	switch (presFlag){
+	switch (station_data->presFlag){
 		case 0:
 			Paint_DrawBitMap_Paste(gNormalPressureLow60X60, 62, 10, 60, 60, BLACK);
 			Paint_DrawString_EN(12, 48, "(Low)", &Font12, WHITE, BLACK);
@@ -167,12 +139,82 @@ void DrawNormalTheme(IMAGE_T *Image)
 		default:
 			break;
 	}
-	Paint_DrawString_EN(10, 18, sPres, &Font8, WHITE, BLACK);
-	Paint_DrawNumDecimals(0, 30, pres, &Font20, 0, BLACK, WHITE);
+	Paint_DrawString_EN(10, 18, SPRES, &Font8, WHITE, BLACK);
+	Paint_DrawNumDecimals(0, 30, station_data->pres, &Font20, 0, BLACK, WHITE);
+
+	return 0;
+}
+
+int DrawNormalHumidity(IMAGE_T *Image, STATION_DATA_T *station_data)
+{
+	if (BME680OFF)
+		station_data->hum = 68;\
+
+	if(Image == NULL || station_data == NULL)
+	{
+		return -1;
+	}
+
+	//Set humidity flag
+	if(station_data->hum >= 0. && station_data->hum < 45.)
+		station_data->humFlag = 0;
+	else if(station_data->hum >= 45. && station_data->hum <= 65.)
+		station_data->humFlag = 1;
+	else if(station_data->hum >= 66. && station_data->hum <= 100.)
+		station_data->humFlag = 2;
+	else
+		return -1;
+
+
+	//Humidity level image selector
+	switch (station_data->humFlag){
+		case 0:
+			Paint_DrawBitMap_Paste(gNormalHumLow60X60, 62, 190, 60, 60, BLACK);
+			break;
+		case 1:
+			Paint_DrawBitMap_Paste(gNormalHumGood60X60, 62, 190, 60, 60, BLACK);
+			break;
+		case 2:
+			Paint_DrawBitMap_Paste(gNormalHumHigh60X60, 62, 190, 60, 60, BLACK);
+			break;
+		default:
+			break;
+	}
+	Paint_DrawString_EN(5, 210, SHUM, &Font8, WHITE, BLACK);
+	Paint_DrawNumDecimals(0, 220, station_data->hum, &Font16, 1, BLACK, WHITE);
+	station_data->xShift = station_data->hum > 10. ? 43 : 32;
+	Paint_DrawString_EN(station_data->xShift, 220, "%", &Font16, WHITE, BLACK);
+
+	return 0;
+}
+
+int DrawNormalAirQuality(IMAGE_T *Image, STATION_DATA_T *station_data)
+{
+	if (BME680OFF)
+		station_data->air = 53;
+
+	if(Image == NULL || station_data == NULL)
+	{
+		return -1;
+	}
+
+	//Set air flag
+	if(station_data->air >= 0 && station_data->air <= 25)
+		station_data->airFlag = 0;
+	else if (station_data->air > 25 && station_data->air <= 50)
+		station_data->airFlag = 1;
+	else if (station_data->air > 50 && station_data->air <= 100)
+		station_data->airFlag = 2;
+	else if (station_data->air > 100 && station_data->air <= 210)
+		station_data->airFlag = 3;
+	else if (station_data->air > 210 && station_data->air <= 500)
+		station_data->airFlag = 4;
+	else
+		return -1;
 
 
 	//AIQ level image selector
-	switch (airFlag){
+	switch (station_data->airFlag){
 		case 0:
 			Paint_DrawBitMap_Paste(gNormalAirExcellent60X60 , 62, 70, 60, 60, BLACK);
 			Paint_DrawString_EN(0, 116, "(Excellent)", &Font8, WHITE, BLACK);
@@ -196,64 +238,39 @@ void DrawNormalTheme(IMAGE_T *Image)
 		default:
 			break;
 	}
-	Paint_DrawString_EN(0, 80, sAir, &Font8, WHITE, BLACK);
-	if (air >= 0 && air <= 10)
-		xShift = 21;
-	else if (air < 100)
-		xShift = 13;
+	Paint_DrawString_EN(0, 80, SAIR, &Font8, WHITE, BLACK);
+	if (station_data->air >= 0 && station_data->air <= 10)
+		station_data->xShift = 21;
+	else if (station_data->air < 100)
+		station_data->xShift = 13;
 	else
-		xShift = 4;
+		station_data->xShift = 4;
 
-	Paint_DrawNumDecimals(xShift, 92, air, &Font24, 0, BLACK, WHITE);
+	Paint_DrawNumDecimals(station_data->xShift, 92, station_data->air, &Font24, 0, BLACK, WHITE);
 
+	return 0;
+}
 
-	//Temperature level image selector
-	switch (tempFlag){
-		case 0:
-			Paint_DrawBitMap_Paste(gNormalTempTerriblyHot60X60, 62, 130, 60, 60, BLACK);
-			break;
-		case 1:
-			Paint_DrawBitMap_Paste(gNormalTempVeryHot60X60, 62, 130, 60, 60, BLACK);
-			break;
-		case 2:
-			Paint_DrawBitMap_Paste(gNormalTempGood60X60, 62, 130, 60, 60, BLACK);
-			break;
-		case 3:
-			Paint_DrawBitMap_Paste(gNormalTempHot60X60, 62, 130, 60, 60, BLACK);
-			break;
-		default:
-			break;
-	}
-	Paint_DrawString_EN(0, 150, sTemp, &Font8, WHITE, BLACK);
-	xShift = temp >= 10. || temp <= 10. ? 45 : 34;
-	Paint_DrawNumDecimals(0, 160, temp, &Font16, 1, BLACK, WHITE);
-	Paint_DrawCircle(xShift, 163, 1, BLACK, 1, DRAW_FILL_EMPTY);
-	Paint_DrawString_EN(xShift, 160, "C", &Font16, WHITE, BLACK);
+void DrawTopBar(IMAGE_T *Image, STATION_DATA_T *station_data)
+{
+	if (BME680OFF)
+		station_data->bat = 53;
 
+	Paint_DrawString_EN(10, 0, "KN KOIoT", &Font12, WHITE, BLACK);
 
-	//Humidity level image selector
-	switch (humFlag){
-		case 0:
-			Paint_DrawBitMap_Paste(gNormalHumLow60X60, 62, 190, 60, 60, BLACK);
-			break;
-		case 1:
-			Paint_DrawBitMap_Paste(gNormalHumGood60X60, 62, 190, 60, 60, BLACK);
-			break;
-		case 2:
-			Paint_DrawBitMap_Paste(gNormalHumHigh60X60, 62, 190, 60, 60, BLACK);
-			break;
-		default:
-			break;
-	}
-	Paint_DrawString_EN(5, 210, sHum, &Font8, WHITE, BLACK);
-	Paint_DrawNumDecimals(0, 220, hum, &Font16, 1, BLACK, WHITE);
-	xShift = hum > 10 ? 43 : 32;
-	Paint_DrawString_EN(xShift, 220, "%", &Font16, WHITE, BLACK);
+	if(station_data->bat >= 80 && station_data->bat <= 100)
+		station_data->batFlag = 0;
+	else if(station_data->bat >= 40 && station_data->bat < 80)
+		station_data->batFlag = 1;
+	else if(station_data->bat >= 0 && station_data->bat < 40)
+		station_data->batFlag = 2;
+	else
+		return;
 
 
 	//Battery status
 	Paint_DrawBitMap_Paste(gBattery45X10, 77, 0, 45, 10, BLACK);
-	switch (batFlag){
+	switch (station_data->batFlag){
 		case 0:
 			Paint_DrawRectangle(106, 3, 117, 8, BLACK, DRAW_FILL_FULL, DRAW_FILL_FULL);
 		case 1:
@@ -262,8 +279,95 @@ void DrawNormalTheme(IMAGE_T *Image)
 			Paint_DrawRectangle(80, 3, 91, 8, BLACK, DRAW_FILL_FULL, DRAW_FILL_FULL);
 		default:
 			break;
-		}
+	}
+}
 
+void Draw_Simple(IMAGE_T *Image, STATION_DATA_T *station_data)
+{
+	if(Image == NULL || station_data == NULL)
+	{
+		return;
+	}
+	Paint_DrawBitMap_Paste(gSimpleSimplest122X250, 0, 0, 122, 250, BLACK);
+
+	if (BME680OFF)
+	{
+			station_data->temp = 5.412;
+			station_data->air = 123;
+			station_data->pres = 1012;
+			station_data->hum = 92.221;
+	}
+
+	//Air
+	Paint_DrawNumDecimals(0, 130, station_data->air, &Font20, 0, BLACK, WHITE);
+	if (station_data->air >= 0 && station_data->air <= 10)
+		station_data->xShift = 14;
+	else if (station_data->air < 100)
+		station_data->xShift = 28;
+	else
+		station_data->xShift = 42;
+	Paint_DrawString_EN(station_data->xShift, 130, "IAQ", &Font20, WHITE, BLACK);
+
+	//Temperature
+	station_data->xShift = station_data->temp >= 10. || station_data->temp <= 10. ? 48 : 38;
+	Paint_DrawNumDecimals(0, 150, station_data->temp, &Font20, 1, BLACK, WHITE);
+	Paint_DrawCircle(station_data->xShift - 2, 153, 1, BLACK, 2, DRAW_FILL_EMPTY);
+	Paint_DrawString_EN(station_data->xShift, 150, "C", &Font20, WHITE, BLACK);
+
+	//Humidity
+	Paint_DrawNumDecimals(0, 170, station_data->hum, &Font20, 1, BLACK, WHITE);
+	station_data->xShift = station_data->hum > 10. ? 56 : 42;
+	Paint_DrawString_EN(station_data->xShift - 3, 170, "%", &Font20, WHITE, BLACK);
+
+	//Pressure
+	Paint_DrawNumDecimals(0, 190, station_data->pres, &Font20, 0, BLACK, WHITE);
+	station_data->xShift = station_data->pres >= 1000. ? 56 : 44;
+	Paint_DrawString_EN(station_data->xShift, 190, "hPa", &Font20, WHITE, BLACK);
+
+
+}
+
+void DrawNormalTheme(IMAGE_T *Image, STATION_DATA_T *station_data)
+{
+	DrawTopBar(Image, station_data);
+	DrawNormalPressure(Image, station_data);
+	DrawNormalAirQuality(Image, station_data);
+	DrawNormalTemperature(Image, station_data);
+	DrawNormalHumidity(Image, station_data);
+}
+
+void DrawSimpleTheme(IMAGE_T *Image, STATION_DATA_T *station_data)
+{
+	Draw_Simple(Image, station_data);
+	DrawTopBar(Image, station_data);
+}
+
+
+
+
+
+void EpaperUpdate(IMAGE_T *Image, STATION_DATA_T *station_data, uint8_t epaper_mode)
+{
+	EpaperWakeUp();
+	EPD_2IN13B_V4_Clear();
+	Paint_SelectImage(Image->BlackImage);
+	Paint_Clear(WHITE);
+
+	switch(epaper_mode)
+	{
+		case SIMPLE_MODE:
+			DrawSimpleTheme(Image, station_data);
+			break;
+		case NORMAL_MODE:
+			DrawNormalTheme(Image, station_data);
+			break;
+		case ADVANCED_MODE:
+//			void DrawAdvancedTheme(Image, station_data);
+			break;
+		default:
+			break;
+	}
 
 	EPD_2IN13B_V4_Display(Image->BlackImage);
+	EPD_2IN13B_V4_Sleep();
 }

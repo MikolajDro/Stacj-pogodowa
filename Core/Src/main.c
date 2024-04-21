@@ -55,6 +55,7 @@
 
 /* USER CODE BEGIN PV */
 IMAGE_T *Image;
+static STATION_DATA_T StationData;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -109,23 +110,9 @@ int main(void)
 
 
   Image = ImageCreator();
-
-
-
-//  EPD_2IN13B_V4_Display(gback2);
-//  Posiotion_test(Image);
-
   EpaperINIT(Image);
 
-
-  EpaperWakeUp();
-
-//  Draw_SimpleImage(Image);
-
-  DrawNormalTheme(Image);
-  EPD_2IN13B_V4_Sleep();
-
-//  uint8_t EpaperState = 0;
+  uint8_t EpaperState = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -135,47 +122,62 @@ int main(void)
   while (1)
   {
 
-	  HAL_Delay(10000);
-	  /*
+	  //Simple mode
 	  if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET)
 	  {
-		  HAL_Delay(50);
-		  if(EpaperState == 1)
-		  {
-			  return;
-		  }
-		  EPD_2IN13B_V4_Display(simpleTheme);
-		  EPD_2IN13B_V4_Sleep();
+		  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+		  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET)
+			  HAL_Delay(1);
 
-		  EpaperState = 1;
+		  if(EpaperState == SIMPLE_MODE)
+		  {
+			  break;
+		  }
+
+		  EpaperState = SIMPLE_MODE;
+		  EpaperUpdate(Image, &StationData, EpaperState);
 	  }
+
+	  //Normal mode
 	  if(HAL_GPIO_ReadPin(B2_GPIO_Port, B2_Pin) == GPIO_PIN_SET)
 	  {
-		  HAL_Delay(50);
-		  if(EpaperState == 2)
-		  {
-			  return;
-		  }
-		  EPD_2IN13B_V4_Display(normalTheme);
-		  EPD_2IN13B_V4_Sleep();
+		  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
+		  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 
-		  EpaperState = 2;
+		  while(HAL_GPIO_ReadPin(B2_GPIO_Port, B2_Pin) == GPIO_PIN_SET)
+		  			  HAL_Delay(1);
+
+		  if(EpaperState == NORMAL_MODE)
+		  {
+			  break;
+		  }
+
+		  EpaperState = NORMAL_MODE;
+		  EpaperUpdate(Image, &StationData, EpaperState);
 	  }
+
+	  //Advanced mode
 	  if(HAL_GPIO_ReadPin(B3_GPIO_Port, B3_Pin) == GPIO_PIN_SET)
 	  {
-		  HAL_Delay(50);
-		  if(EpaperState == 3)
-		  {
-			  return;
-		  }
-		  EPD_2IN13B_V4_Display(advancedTheme);
-		  EPD_2IN13B_V4_Sleep();
+		  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
+		  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 
-		  EpaperState = 3;
+		  while(HAL_GPIO_ReadPin(B3_GPIO_Port, B3_Pin) == GPIO_PIN_SET)
+		  			  HAL_Delay(1);
+
+		  if(EpaperState == ADVANCED_MODE)
+		  {
+			  break;
+		  }
+
+		  EpaperState = ADVANCED_MODE;
+		  EpaperUpdate(Image, &StationData, EpaperState);
 	  }
 
-
-		*/
 
 
     /* USER CODE END WHILE */

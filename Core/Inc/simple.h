@@ -8,6 +8,7 @@
 #ifndef INC_SIMPLE_H_
 #define INC_SIMPLE_H_
 
+extern const unsigned char gInitImage122X250[];
 extern const unsigned char gSimpleSimplest122X250[];
 
 extern const unsigned char gBattery45X10[];
