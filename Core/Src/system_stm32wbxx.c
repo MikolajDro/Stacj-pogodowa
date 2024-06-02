@@ -228,7 +228,8 @@ void SystemInit(void)
   /* Reset CFGR register */
   RCC->CFGR = 0x00070000U;
 
-  /* Reset PLLSAI1ON, PLLON, HSECSSON, HSEON, HSION, and MSIPLLON bits */  RCC->CR &= (uint32_t)0xFAF6FEFBU;
+  /* Reset PLLSAI1ON, PLLON, HSECSSON, HSEON, HSION, and MSIPLLON bits */
+  RCC->CR &= (uint32_t)0xFAF6FEFBU;
 
   /*!< Reset LSI1 and LSI2 bits */
   RCC->CSR &= (uint32_t)0xFFFFFFFAU;

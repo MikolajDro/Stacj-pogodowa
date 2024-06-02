@@ -18,8 +18,11 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "dma.h"
 #include "memorymap.h"
+#include "rtc.h"
 #include "spi.h"
+#include "tim.h"
 #include "usart.h"
 #include "usb.h"
 #include "gpio.h"
@@ -27,12 +30,9 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-#include "EPD_Test.h"
-#include "EPD_2in13b_V4.h"
-#include "GUI_Paint.h"
-#include <time.h>
-#include "back.h"
-#include "functions_test.h"
+#include "low_power.h"
+#include "../epaper/epaper_functions.h"
+#include "service_UART.h"
 
 /* USER CODE END Includes */
 
@@ -54,13 +54,14 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-IMAGE_T *Image;
-static STATION_DATA_T StationData;
+
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void PeriphCommonClock_Config(void);
+static void MX_NVIC_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -101,84 +102,33 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_USB_PCD_Init();
+  MX_RTC_Init();
+  MX_TIM17_Init();
   MX_SPI1_Init();
+
+  /* Initialize interrupts */
+  MX_NVIC_Init();
   /* USER CODE BEGIN 2 */
 
-//  EPD_test();
+  rtc_init();
+  EpaperINIT();
+  service_init();
 
-
-  Image = ImageCreator();
-  EpaperINIT(Image);
-
-  uint8_t EpaperState = 0;
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-
-
   while (1)
   {
 
-	  //Simple mode
-	  if(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET)
-	  {
-		  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-		  while(HAL_GPIO_ReadPin(B1_GPIO_Port, B1_Pin) == GPIO_PIN_SET)
-			  HAL_Delay(1);
+	  epaper_state_machine();
 
-		  if(EpaperState == SIMPLE_MODE)
-		  {
-			  break;
-		  }
+	  service();
 
-		  EpaperState = SIMPLE_MODE;
-		  EpaperUpdate(Image, &StationData, EpaperState);
-	  }
-
-	  //Normal mode
-	  if(HAL_GPIO_ReadPin(B2_GPIO_Port, B2_Pin) == GPIO_PIN_SET)
-	  {
-		  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_SET);
-		  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-
-		  while(HAL_GPIO_ReadPin(B2_GPIO_Port, B2_Pin) == GPIO_PIN_SET)
-		  			  HAL_Delay(1);
-
-		  if(EpaperState == NORMAL_MODE)
-		  {
-			  break;
-		  }
-
-		  EpaperState = NORMAL_MODE;
-		  EpaperUpdate(Image, &StationData, EpaperState);
-	  }
-
-	  //Advanced mode
-	  if(HAL_GPIO_ReadPin(B3_GPIO_Port, B3_Pin) == GPIO_PIN_SET)
-	  {
-		  HAL_GPIO_WritePin(LD1_GPIO_Port, LD1_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
-		  HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-
-		  while(HAL_GPIO_ReadPin(B3_GPIO_Port, B3_Pin) == GPIO_PIN_SET)
-		  			  HAL_Delay(1);
-
-		  if(EpaperState == ADVANCED_MODE)
-		  {
-			  break;
-		  }
-
-		  EpaperState = ADVANCED_MODE;
-		  EpaperUpdate(Image, &StationData, EpaperState);
-	  }
-
-
+	  low_power_mode();
 
     /* USER CODE END WHILE */
 
@@ -216,8 +166,9 @@ void SystemClock_Config(void)
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_HSE
-                              |RCC_OSCILLATORTYPE_LSE|RCC_OSCILLATORTYPE_MSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI1
+                              |RCC_OSCILLATORTYPE_HSE|RCC_OSCILLATORTYPE_LSE
+                              |RCC_OSCILLATORTYPE_MSI;
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.LSEState = RCC_LSE_ON;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
@@ -225,6 +176,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.MSICalibrationValue = RCC_MSICALIBRATION_DEFAULT;
   RCC_OscInitStruct.MSIClockRange = RCC_MSIRANGE_6;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -274,6 +226,17 @@ void PeriphCommonClock_Config(void)
   /* USER CODE BEGIN Smps */
 
   /* USER CODE END Smps */
+}
+
+/**
+  * @brief NVIC Configuration.
+  * @retval None
+  */
+static void MX_NVIC_Init(void)
+{
+  /* RTC_Alarm_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(RTC_Alarm_IRQn, 2, 1);
+  HAL_NVIC_EnableIRQ(RTC_Alarm_IRQn);
 }
 
 /* USER CODE BEGIN 4 */
